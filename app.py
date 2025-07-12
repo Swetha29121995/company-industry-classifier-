@@ -1,17 +1,3 @@
-import subprocess, sys
-
-# Ensure spacy and joblib are installed
-for pkg in ("spacy", "joblib"):
-    try:
-        __import__(pkg)
-    except ModuleNotFoundError:
-        subprocess.run([sys.executable, "-m", "pip", "install", pkg], check=True)
-
-# Ensure spaCy model is installed
-import importlib
-if not importlib.util.find_spec("en_core_web_sm"):
-    subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
-
 import streamlit as st
 import spacy
 import joblib
