@@ -1,11 +1,7 @@
-try:
-    import joblib
-except ModuleNotFoundError:
-    import os
-    os.system("pip install joblib")
-    import joblib
 import streamlit as st
 import spacy
+import joblib
+
 
 nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
 
