@@ -1,4 +1,7 @@
-print("🔧 Requirements installed:", "\n".join(sorted(__import__('pkg_resources').working_set.by_key.keys())))
+import importlib.metadata
+
+installed_packages = sorted(d.metadata['Name'] for d in importlib.metadata.distributions())
+print("🔧 Installed packages:\n", "\n".join(installed_packages))
 
 import streamlit as st
 import spacy
