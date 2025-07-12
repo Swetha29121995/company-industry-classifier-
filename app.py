@@ -1,3 +1,5 @@
+print("🔧 Requirements installed:", "\n".join(sorted(__import__('pkg_resources').working_set.by_key.keys())))
+
 import streamlit as st
 import spacy
 import joblib
