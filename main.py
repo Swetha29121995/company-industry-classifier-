@@ -1,27 +1,46 @@
 import streamlit as st
 import spacy
 import joblib
-import os # Import os to check for file existence
+import os
+import sys # Import sys for exiting gracefully
 
 # --- Initial setup for package listing (optional, for debugging/info) ---
 # This part is useful for checking installed packages in a deployed environment.
-try:
-    import importlib.metadata
-    installed_packages = sorted(d.metadata['Name'] for d in importlib.metadata.distributions())
-    # st.sidebar.write("🔧 Installed packages:\n", "\n".join(installed_packages)) # You can uncomment to show in sidebar
-except ImportError:
-    # For Python versions older than 3.8 where importlib.metadata might not be available directly
-    # or if there's an issue with the import.
-    # print("importlib.metadata not available or failed to import.")
-    pass
+# You can uncomment this if you want to see the installed packages in your Streamlit app's sidebar.
+# try:
+#     import importlib.metadata
+#     installed_packages = sorted(d.metadata['Name'] for d in importlib.metadata.distributions())
+#     st.sidebar.write("🔧 Installed packages:\n", "\n".join(installed_packages))
+# except ImportError:
+#     pass # For Python versions older than 3.8 or if importlib.metadata fails
 
-# --- Load spaCy model ---
-# Ensure the spaCy model is downloaded. If not, run: python -m spacy download en_core_web_sm
-try:
-    nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
-except OSError:
-    st.error("SpaCy model 'en_core_web_sm' not found. Please run 'python -m spacy download en_core_web_sm' in your terminal.")
-    st.stop() # Stop the app if the model isn't available
+# --- SpaCy Model Loading ---
+SPACY_MODEL_NAME = "en_core_web_sm"
+
+@st.cache_resource # Use st.cache_resource for heavy objects like spaCy models
+def load_spacy_model():
+    """
+    Loads the spaCy model. If not found, attempts to download it.
+    This function is cached to avoid re-downloading/reloading on every rerun.
+    """
+    try:
+        nlp_model = spacy.load(SPACY_MODEL_NAME, disable=["ner", "parser"])
+        return nlp_model
+    except OSError:
+        st.warning(f"SpaCy model '{SPACY_MODEL_NAME}' not found. Attempting to download...")
+        with st.spinner(f"Downloading spaCy model '{SPACY_MODEL_NAME}'... This might take a moment."):
+            try:
+                # Use spacy.cli.download to get the model
+                spacy.cli.download(SPACY_MODEL_NAME)
+                nlp_model = spacy.load(SPACY_MODEL_NAME, disable=["ner", "parser"])
+                st.success(f"SpaCy model '{SPACY_MODEL_NAME}' downloaded and loaded successfully!")
+                return nlp_model
+            except Exception as e:
+                st.error(f"Failed to download spaCy model '{SPACY_MODEL_NAME}'. Please ensure your internet connection is stable or try again later.")
+                st.error(f"Error details: {e}")
+                st.stop() # Stop the app if model cannot be loaded/downloaded
+
+nlp = load_spacy_model()
 
 # Function to preprocess text using spaCy
 def tokenize_lemmatize(text):
@@ -39,26 +58,35 @@ LOGREG_MODEL_PATH = "logreg_model.pkl"
 SVM_MODEL_PATH = "svm_model.pkl"
 LABEL_ENCODER_PATH = "label_encoder.pkl"
 
-# Check if all model files exist before attempting to load them
-model_files_exist = True
-for path in [TFIDF_MODEL_PATH, LOGREG_MODEL_PATH, SVM_MODEL_PATH, LABEL_ENCODER_PATH]:
-    if not os.path.exists(path):
-        st.error(f"Required model file not found: `{path}`. Please ensure all .pkl files are in the same directory.")
-        model_files_exist = False
-        break
+@st.cache_resource # Cache the loading of joblib models too
+def load_ml_models():
+    """
+    Loads the machine learning models and vectorizer.
+    This function is cached to avoid re-loading on every rerun.
+    """
+    # Check if all model files exist before attempting to load them
+    model_files_exist = True
+    for path in [TFIDF_MODEL_PATH, LOGREG_MODEL_PATH, SVM_MODEL_PATH, LABEL_ENCODER_PATH]:
+        if not os.path.exists(path):
+            st.error(f"Required model file not found: `{path}`. Please ensure all .pkl files are committed to your GitHub repository.")
+            model_files_exist = False
+            break
 
-if not model_files_exist:
-    st.stop() # Stop the app if any model file is missing
+    if not model_files_exist:
+        st.stop() # Stop the app if any model file is missing
 
-# Load the models only if all files are present
-try:
-    tfidf = joblib.load(TFIDF_MODEL_PATH)
-    lr_model = joblib.load(LOGREG_MODEL_PATH)
-    svm_model = joblib.load(SVM_MODEL_PATH)
-    le = joblib.load(LABEL_ENCODER_PATH)
-except Exception as e:
-    st.error(f"Error loading model files: {e}. Please check if the files are valid .pkl files.")
-    st.stop() # Stop the app if there's an error loading models
+    # Load the models only if all files are present
+    try:
+        tfidf_vec = joblib.load(TFIDF_MODEL_PATH)
+        lr_m = joblib.load(LOGREG_MODEL_PATH)
+        svm_m = joblib.load(SVM_MODEL_PATH)
+        le_obj = joblib.load(LABEL_ENCODER_PATH)
+        return tfidf_vec, lr_m, svm_m, le_obj
+    except Exception as e:
+        st.error(f"Error loading model files: {e}. Please check if the files are valid .pkl files.")
+        st.stop() # Stop the app if there's an error loading models
+
+tfidf, lr_model, svm_model, le = load_ml_models()
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Company Industry Classifier", layout="centered")
@@ -108,4 +136,4 @@ if st.button("Predict Industry", type="primary"):
 
 st.markdown("---")
 st.caption("Built with ❤️ using Streamlit, scikit-learn, and spaCy.")
-st.caption("Ensure `en_core_web_sm` spaCy model and all `.pkl` model files are present.")
+st.caption("Ensure all `.pkl` model files are committed to your GitHub repository.")
